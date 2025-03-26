@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8">
+  <title>Classificador de Moda</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.9.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 20px; }
+    #resultat { font-size: 1.5rem; margin-top: 20px; }
+    video, canvas, img { width: 300px; margin: 10px auto; display: block; }
+  </style>
+</head>
+<body>
+  <h1>Classificador de Productes de Moda</h1>
+
+  <h3>Tria una opció:</h3>
+  <button onclick="iniciarWebcam()">Usar càmera</button>
+  <button onclick="document.getElementById('imatgeInput').click()">Pujar imatge</button>
+  <input type="file" id="imatgeInput" accept="image/*" style="display:none" onchange="classificaImatge(this)">
+
+  <div>
+    <video id="webcam" autoplay playsinline></video>
+  </div>
+
+  <img id="imatgePujada" style="display:none">
+
+  <div id="resultat"></div>
+
+  <script>
+    const URL = "model/"; // Carpeta on tens el model
+    let model;
+    let intervalCamera = null;
+    let intervalImatge = null;
+
+    async function carregarModel() {
+      model = await tmImage.load(URL + "model.json", URL + "metadata.json");
+    }
+    carregarModel();
+
+    function iniciarWebcam() {
+      const video = document.getElementById("webcam");
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          video.srcObject = stream;
+
+          // Evita múltiples intervals
+          if (intervalCamera) clearInterval(intervalCamera);
+
+          // Esperem una mica i comencem classificació cada 1s
+          setTimeout(() => {
+            intervalCamera = setInterval(() => {
+              classificaWebcam();
+            }, 1000);
+          }, 1000);
+        });
+    }
+
+    async function classificaWebcam() {
+      const video = document.getElementById("webcam");
+      if (model && video.readyState === 4) {
+        const prediction = await model.predict(video);
+        mostraResultats(prediction);
+      }
+    }
+
+    async function classificaImatge(input) {
+      const img = document.getElementById("imatgePujada");
+      img.src = URL.createObjectURL(input.files[0]);
+      img.onload = async () => {
+        img.style.display = 'block';
+        const prediction = await model.predict(img);
+        mostraResultats(prediction);
+
+        // Evitem múltiples intervals
+        if (intervalImatge) clearInterval(intervalImatge);
+
+        // Torna a classificar la imatge cada segon
+        intervalImatge = setInterval(async () => {
+          const prediction = await model.predict(img);
+          mostraResultats(prediction);
+        }, 1000);
+      }
+    }
+
+    function mostraResultats(prediction) {
+      prediction.sort((a, b) => b.probability - a.probability);
+      const top = prediction[0];
+      document.getElementById("resultat").innerText = `Classe: ${top.className} (Confiança: ${(top.probability * 100).toFixed(1)}%)`;
+    }
+  </script>
+</body>
+</html>
