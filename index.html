@@ -8,14 +8,29 @@
   <style>
     body { font-family: sans-serif; text-align: center; padding: 20px; }
     #resultat { font-size: 1.5rem; margin-top: 20px; }
-    video, canvas, img { width: 300px; margin: 10px auto; display: block; }
+    video, canvas, img {
+      width: 90vw;
+      max-width: 400px;
+      margin: 10px auto;
+      display: block;
+      transform: rotate(0deg);
+    }
+
+    @media (orientation: landscape) {
+      video {
+        transform: rotate(90deg);
+        height: 90vh;
+        width: auto;
+      }
+    }
   </style>
 </head>
 <body>
   <h1>Classificador de Productes de Moda</h1>
 
   <h3>Tria una opció:</h3>
-  <button onclick="iniciarWebcam()">Usar càmera</button>
+  <button onclick="iniciarWebcam(false)">Usar càmera frontal</button>
+  <button onclick="iniciarWebcam(true)">Usar càmera posterior</button>
   <button onclick="document.getElementById('imatgeInput').click()">Pujar imatge</button>
   <input type="file" id="imatgeInput" accept="image/*" style="display:none" onchange="classificaImatge(this)">
 
@@ -24,11 +39,10 @@
   </div>
 
   <img id="imatgePujada" style="display:none">
-
   <div id="resultat"></div>
 
   <script>
-    const URL = "model/"; // Carpeta on tens el model
+    const URL = "model/";
     let model;
     let intervalCamera = null;
     let intervalImatge = null;
@@ -38,21 +52,29 @@
     }
     carregarModel();
 
-    function iniciarWebcam() {
+    function iniciarWebcam(useBackCamera) {
       const video = document.getElementById("webcam");
-      navigator.mediaDevices.getUserMedia({ video: true })
+
+      if (intervalCamera) clearInterval(intervalCamera);
+
+      const constraints = {
+        video: {
+          facingMode: useBackCamera ? "environment" : "user"
+        }
+      };
+
+      navigator.mediaDevices.getUserMedia(constraints)
         .then(stream => {
           video.srcObject = stream;
 
-          // Evita múltiples intervals
-          if (intervalCamera) clearInterval(intervalCamera);
-
-          // Esperem una mica i comencem classificació cada 1s
           setTimeout(() => {
             intervalCamera = setInterval(() => {
               classificaWebcam();
             }, 1000);
           }, 1000);
+        })
+        .catch(err => {
+          alert("No s'ha pogut accedir a la càmera: " + err.message);
         });
     }
 
@@ -72,10 +94,8 @@
         const prediction = await model.predict(img);
         mostraResultats(prediction);
 
-        // Evitem múltiples intervals
         if (intervalImatge) clearInterval(intervalImatge);
 
-        // Torna a classificar la imatge cada segon
         intervalImatge = setInterval(async () => {
           const prediction = await model.predict(img);
           mostraResultats(prediction);
